@@ -1,0 +1,130 @@
+const express = require("express");
+const app = express();
+
+app.use(express.json());
+
+// Authentication middleware
+function authenticateUser(req, res, next) {
+    const token = req.headers.authorization;
+
+    if (!token) {
+        return res.status(401).json({
+            success: false,
+            message: "Authentication required"
+        });
+    }
+
+    // Token verification
+    req.user = {
+        id: "USER001",
+        role: "student"
+    };
+
+    next();
+}
+
+// Authorization middleware
+function authorizeRole(roles) {
+    return (req, res, next) => {
+        if (!roles.includes(req.user.role)) {
+            return res.status(403).json({
+                success: false,
+                message: "Access denied"
+            });
+        }
+
+        next();
+    };
+}
+
+// Resource API
+app.get("/api/resources",
+    authenticateUser,
+    authorizeRole(["student", "faculty", "admin"]),
+    (req, res) => {
+
+        const resources = [
+            {
+                id: 1,
+                name: "Seminar Hall",
+                status: "Available"
+            },
+            {
+                id: 2,
+                name: "Computer Lab",
+                status: "Available"
+            }
+        ];
+
+        console.log("Audit: Resource data accessed");
+
+        res.status(200).json({
+            success: true,
+            resources: resources
+        });
+    }
+);
+
+// Booking API
+app.post("/api/bookings",
+    authenticateUser,
+    authorizeRole(["student", "faculty", "admin"]),
+    (req, res) => {
+
+        const { resourceId, date, startTime, endTime } = req.body;
+
+        // Validate request data
+        if (!resourceId || !date || !startTime || !endTime) {
+            return res.status(400).json({
+                success: false,
+                message: "Required booking data is missing"
+            });
+        }
+
+        // Create booking
+        const booking = {
+            bookingId: "B001",
+            userId: req.user.id,
+            resourceId: resourceId,
+            date: date,
+            startTime: startTime,
+            endTime: endTime
+        };
+
+        // Record audit information
+        console.log("Audit: New booking created", booking);
+
+        res.status(201).json({
+            success: true,
+            message: "Booking created successfully",
+            booking: booking
+        });
+    }
+);
+
+// Get booking details
+app.get("/api/bookings/:id",
+    authenticateUser,
+    (req, res) => {
+
+        const bookingId = req.params.id;
+
+        if (!bookingId) {
+            return res.status(400).json({
+                success: false,
+                message: "Booking ID is required"
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            bookingId: bookingId,
+            message: "Booking details retrieved successfully"
+        });
+    }
+);
+
+// Start server
+app.listen(3000, () => {
+    console.log("Smart Campus API running on port 3000");
+});
